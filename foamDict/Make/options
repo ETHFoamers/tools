@@ -1,2 +1,9 @@
-/* EXE_INC = */
+/* Set up hex integer version */
+
+ifndef FOAM_HEX_VERSION
+FOAM_HEX_VERSION=0x$(subst .,,$(WM_PROJECT_VERSION:.x=.0))
+endif
+
+EXE_INC = -DFOAM_HEX_VERSION=$(FOAM_HEX_VERSION)
+
 /* EXE_LIBS = */

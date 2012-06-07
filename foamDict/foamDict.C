@@ -135,6 +135,10 @@ using namespace Foam;
 
 // * * * * * * * * * * * * * Local Helper Functions  * * * * * * * * * * * * //
 
+#ifndef FOAM_HEX_VERSION
+#error FOAM_HEX_VERSION not defined
+#endif
+
 namespace
 {
 
@@ -204,10 +208,80 @@ void writeDict(Ostream& os, dictionary& dict)
 }
 
 
+// Helper to read a dictionary from file including the header
+void dictRead(dictionary& dict, Istream& is)
+{
+#if FOAM_HEX_VERSION < 0x200
+    // This is a simple copy-paste from the 1.7.x dictionary::read(Istream&)
+    // sans the erase("FoamFile") invocation.
+    if (!is.good())
+    {
+        FatalIOErrorIn("dictRead(dictionary&, Istream&)", is)
+            << "Istream not OK for reading dictionary "
+            << exit(FatalIOError);
+        return;
+    }
+
+    token currToken(is);
+    if (currToken != token::BEGIN_BLOCK)
+    {
+        is.putBack(currToken);
+    }
+
+    while (!is.eof() && entry::New(dict, is))
+    {}
+
+    if (is.bad())
+    {
+        Info<< "dictRead(dictionary&, Istream&) : "
+            << "Istream not OK after reading dictionary " << dict.name()
+            << endl;
+    }
+#else
+    (void)dict.read(is, true);
+#endif
+}
+
+
+// Helper to write only the contents of a primitiveEntry
+void writePrimitiveEntry(const primitiveEntry& pe, Ostream& os)
+{
+#if FOAM_HEX_VERSION < 0x200
+    // This is a straight copy from primitiveEntry::write(Ostream&) sans the
+    // keyword and END_STATEMENT
+    for (label i=0; i<pe.size(); i++)
+    {
+        os << pe[i];
+
+        if (i < pe.size()-1)
+        {
+            os << token::SPACE;
+        }
+    }
+#else
+    pe.write(os, true);
+#endif
+}
+
+
+// Helper macros for adding options dependent on the OpenFOAM version
+#if FOAM_HEX_VERSION < 0x200
+#define ADD_NOTE(NOTE)
+#define ADD_OPTION(NAME, META, DOC) argList::validOptions.insert(NAME, META)
+#define ADD_BOOL_OPTION(NAME, DOC) argList::validOptions.insert(NAME, "")
+#define REMOVE_OPTION(NAME) argList::validOptions.erase(NAME)
+#else
+#define ADD_NOTE(NOTE) argList::addNote(NOTE)
+#define ADD_OPTION(NAME, META, DOC) argList::addOption(NAME, META, DOC)
+#define ADD_BOOL_OPTION(NAME, DOC) argList::addBoolOption(NAME, DOC)
+#define REMOVE_OPTION(NAME) argList::removeOption(NAME)
+#endif
+
+
 // Helper to set up the options
 void initArgList()
 {
-    argList::addNote
+    ADD_NOTE
     (
         "Query and modify OpenFOAM dictionary files. When modifying the\n"
         "dictionary, this utility *REMOVES* comments. By default output is\n"
@@ -218,58 +292,58 @@ void initArgList()
         "Keys can be of the form <parent>/<sub>/<entry>."
     );
 
-    argList::addOption
+    ADD_OPTION
     (
         "dict",
         "dictionary",
         "The dictionary to operate on."
     );
 
-    argList::addOption
+    ADD_OPTION
     (
         "key",
         "key",
         "The dictionary entry to operate on."
     );
 
-    argList::addBoolOption
+    ADD_BOOL_OPTION
     (
         "toc",
         "Print the table of contents."
     );
 
-    argList::addBoolOption
+    ADD_BOOL_OPTION
     (
         "keys",
         "Return the list of available keys."
     );
 
-    argList::addBoolOption
+    ADD_BOOL_OPTION
     (
         "patternKeys",
         "Return the list of available patterns."
     );
 
-    argList::addBoolOption
+    ADD_BOOL_OPTION
     (
         "found",
         "Exits with 0 if <key> was found, 1 otherwise."
     );
 
-    argList::addBoolOption
+    ADD_BOOL_OPTION
     (
         "lookup",
         "Lookup the given key. Returns an error if the entry does not exist."
     );
 
-    argList::addOption
+    ADD_OPTION
     (
         "set",
         "value",
         "Assign a new entry <key>, overwriting an existing entry."
     );
 
-    argList::addOption
+    ADD_OPTION
     (
         "merge",
         "string",
@@ -277,20 +351,20 @@ void initArgList()
         "perform multiple -set operations in a single invocation."
     );
 
-    argList::addOption
+    ADD_OPTION
     (
         "mergeSub",
         "mergeKey",
         "Merge with the dictionary named in <mergeKey>."
     );
 
-    argList::addBoolOption
+    ADD_BOOL_OPTION
     (
         "remove",
         "Remove the <key> entry."
     );
 
-    argList::addOption
+    ADD_OPTION
     (
         "changeKey",
         "newKey",
@@ -298,20 +372,20 @@ void initArgList()
         "word."
     );
 
-    argList::addBoolOption
+    ADD_BOOL_OPTION
     (
         "clear",
         "Clear the dictionary specified by <key>."
     );
 
-    argList::addOption
+    ADD_OPTION
     (
         "default",
         "value",
         "Specify a default value for the -lookup operation."
     );
 
-    argList::addOption
+    ADD_OPTION
     (
         "addDefault",
         "value",
@@ -319,7 +393,7 @@ void initArgList()
         "be written to the dictionary if the entry does not exist."
     );
 
-    argList::addOption
+    ADD_OPTION
     (
         "o",
         "fileName",
@@ -328,7 +402,7 @@ void initArgList()
         "result to standard output instead."
     );
 
-    argList::addBoolOption
+    ADD_BOOL_OPTION
     (
         "inplace",
         "Specify that the modifying operations should write back the output "
@@ -337,7 +411,7 @@ void initArgList()
         "-addDefault for the single exception)."
     );
 
-    argList::addBoolOption
+    ADD_BOOL_OPTION
     (
         "i",
         "This is short for -inplace."
@@ -345,8 +419,8 @@ void initArgList()
 
     argList::noBanner();
     argList::noParallel();
-    argList::removeOption("case");
-    argList::removeOption("noFunctionObjects");
+    REMOVE_OPTION("case");
+    REMOVE_OPTION("noFunctionObjects");
 }
 
 } // End anonymous namespace
@@ -359,6 +433,34 @@ int main(int argc, char *argv[])
 {
     initArgList();
     argList args(argc, argv);
+
+#if FOAM_HEX_VERSION < 0x200
+    // Make the arguments of these options strings in OpenFOAM terms
+    const char* stringOptsArray[] =
+    {
+        "dict",
+        "key",
+        "mergeSub",
+        "changeKey",
+        "o"
+    };
+    UList<const char*> stringOpts
+    (
+        stringOptsArray,
+        sizeof(stringOptsArray)/sizeof(char*)
+    );
+    forAll(stringOpts, i)
+    {
+        word opt = stringOpts[i];
+        if (args.optionFound(opt)
+         && args.options()[opt][0] != '"')
+        {
+            // THIS IS A HACK
+            string& s = const_cast<string&>(args.options()[opt]);
+            s = "\"" + s + "\"";
+        }
+    }
+#endif
 
     // List and enum of available operations
     const char* operationsArray[] =
@@ -445,7 +547,7 @@ int main(int argc, char *argv[])
     {
         IFstream ifs(fName);
         // Read including the header
-        dict.read(ifs, true);
+        dictRead(dict, ifs);
     }
 
     // Prepare output stream
@@ -486,7 +588,8 @@ int main(int argc, char *argv[])
     Ostream& os = outFileStream.valid() ? outFileStream() : Info;
 
     // Perform actual operations
-    fileName key = args.optionLookupOrDefault("key", fileName::null);
+    fileName key = fileName::null;
+    (void) args.optionReadIfPresent("key", key);
     switch(op)
     {
         case OPERATION_NONE:
@@ -510,10 +613,10 @@ int main(int argc, char *argv[])
 
         case OPERATION_LOOKUP:
         {
-            string defValue =
-                args.optionLookupOrDefault("default", string::null);
-            string defAddValue =
-                args.optionLookupOrDefault("addDefault", string::null);
+            string defValue = string::null;
+            args.optionReadIfPresent("default", defValue);
+            string defAddValue = string::null;
+            args.optionReadIfPresent("addDefault", defAddValue);
             if (defValue != string::null && defAddValue != string::null)
             {
                 FatalErrorIn("main(int, argc**)")
@@ -567,7 +670,7 @@ int main(int argc, char *argv[])
                 // We know this is a primitive entry, so we don't want the
                 // ugly formatting of a ITstream.
                 primitiveEntry pe(childKey, d.lookup(childKey));
-                pe.write(Info, true);
+                writePrimitiveEntry(pe, Info);
                 Info<< nl;
             }
             break;
