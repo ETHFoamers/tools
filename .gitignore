@@ -1,0 +1,17 @@
+# dependency files - anywhere
+*.dep
+
+# lnInclude (symlink) folders - anywhere
+lnInclude
+
+# build folders - anywhere
+linux*Clang*/
+linux*Gcc*/
+linux*Icc*/
+linuxming*/
+SiCortex*Gcc*/
+solaris*Gcc*/
+SunOS*Gcc*/
+platforms/
+
+# end-of-file
