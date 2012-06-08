@@ -601,13 +601,25 @@ int main(int argc, char *argv[])
             break;
 
         case OPERATION_TOC:
-            Info<< dict.toc();
+        {
+            wordList toc = dict.toc();
+            forAll(toc, i)
+            {
+                Info<< toc[i] << nl;
+            }
             break;
+        }
 
         case OPERATION_KEYS:
         case OPERATION_PATTERNKEYS:
-            Info<< dict.keys(op==OPERATION_PATTERNKEYS);
+        {
+            List<keyType> keys = dict.keys(op==OPERATION_PATTERNKEYS);
+            forAll(keys, i)
+            {
+                Info<< keys[i] << nl;
+            }
             break;
+        }
 
         case OPERATION_FOUND:
             return !dictFound(dict, key);
