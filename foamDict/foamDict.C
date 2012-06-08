@@ -442,7 +442,9 @@ int main(int argc, char *argv[])
         "key",
         "mergeSub",
         "changeKey",
-        "o"
+        "o",
+        "default",
+        "addDefault"
     };
     UList<const char*> stringOpts
     (
