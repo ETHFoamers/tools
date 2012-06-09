@@ -211,7 +211,6 @@ void writeDict(Ostream& os, dictionary& dict)
 // Helper to read a dictionary from file including the header
 void dictRead(dictionary& dict, Istream& is)
 {
-#if FOAM_HEX_VERSION < 0x200
     // This is a simple copy-paste from the 1.7.x dictionary::read(Istream&)
     // sans the erase("FoamFile") invocation.
     if (!is.good())
@@ -222,24 +221,26 @@ void dictRead(dictionary& dict, Istream& is)
         return;
     }
 
-    token currToken(is);
-    if (currToken != token::BEGIN_BLOCK)
+    // Read header if present -- straight adaptation from IOobject::readHeader
+    // This is needed for handling binary files
+    autoPtr<dictionary> headerDict;
+    token firstToken(is);
+    if
+    (
+        is.good()
+     && firstToken.isWord()
+     && firstToken.wordToken() == "FoamFile"
+    )
     {
-        is.putBack(currToken);
+        headerDict.reset(new dictionary(is));
+
+        is.version(headerDict().lookup("version"));
+        is.format(headerDict().lookup("format"));
     }
 
-    while (!is.eof() && entry::New(dict, is))
-    {}
+    (void)dict.read(is);
 
-    if (is.bad())
-    {
-        Info<< "dictRead(dictionary&, Istream&) : "
-            << "Istream not OK after reading dictionary " << dict.name()
-            << endl;
-    }
-#else
-    (void)dict.read(is, true);
-#endif
+    dict.set("FoamFile", headerDict());
 }
 
 
@@ -544,21 +545,43 @@ int main(int argc, char *argv[])
             << exit(FatalError);
     }
     fileName fName = args.optionRead<fileName>("dict");
+    // Handle compressed files. Remove .gz if specified by user, OpenFOAM
+    // handles this on its own and actually gets confused if it is present.
+    if (fName.ext() == "gz")
+    {
+        fName = fName.lessExt();
+    }
     dictionary dict(fName);
     {
         IFstream ifs(fName);
-        // Read including the header
+        // Read including the header, handling binary files
         dictRead(dict, ifs);
     }
 
     // Prepare output stream
+    IOstream::streamFormat outFmt = IOstream::ASCII;
+    if (dict.found("FoamFile"))
+    {
+        const dictionary& ff = dict.subDict("FoamFile");
+        outFmt =
+            IOstream::formatEnum(ff.lookupOrDefault<word>("format", "ascii"));
+    }
+    IOstream::compressionType cmpType = IOstream::UNCOMPRESSED;
+    if (isFile(fName + ".gz", false))
+    {
+        cmpType = IOstream::COMPRESSED;
+    }
+    IOstream::versionNumber strmVer = IOstream::currentVersion;
     autoPtr<Ostream> outFileStream;
     switch(op)
     {
         case OPERATION_LOOKUP:
             if (args.optionFound("addDefault"))
             {
-                outFileStream.reset(new OFstream(fName));
+                outFileStream.reset
+                (
+                    new OFstream(fName, outFmt, strmVer, cmpType)
+                );
             }
             break;
         case OPERATION_SET:
@@ -579,7 +602,10 @@ int main(int argc, char *argv[])
             }
             if (outName != fileName::null)
             {
-                outFileStream.reset(new OFstream(outName));
+                outFileStream.reset
+                (
+                    new OFstream(outName, outFmt, strmVer, cmpType)
+                );
             }
             break;
         }
