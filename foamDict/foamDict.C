@@ -442,7 +442,6 @@ int main(int argc, char *argv[])
         "key",
         "mergeSub",
         "changeKey",
-        "o",
         "default",
         "addDefault"
     };
