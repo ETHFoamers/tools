@@ -1,9 +1,19 @@
 /* Set up hex integer version */
 
 ifndef FOAM_HEX_VERSION
-FOAM_HEX_VERSION=0x$(subst .,,$(WM_PROJECT_VERSION:.x=.0))
+FOAM_HEX_VERSION:=0x$(subst -ext,,$(subst .,,$(WM_PROJECT_VERSION:.x=.0)))
 endif
 
 EXE_INC = -DFOAM_HEX_VERSION=$(FOAM_HEX_VERSION)
+
+/* Detect git version */
+ifneq (,$(findstring .x,$(WM_PROJECT_VERSION)))
+EXE_INC += -DFOAM_GIT_VERSION
+endif
+
+/* Detect ext version */
+ifdef FOAM_DEV
+EXE_INC += -DFOAM_EXT_VERSION
+endif
 
 /* EXE_LIBS = */

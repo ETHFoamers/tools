@@ -580,7 +580,14 @@ int main(int argc, char *argv[])
             {
                 outFileStream.reset
                 (
-                    new OFstream(fName, outFmt, strmVer, cmpType)
+                    new OFstream
+                    (
+                        fName,
+                        #ifdef FOAM_EXT_VERSION
+                        std::ios_base::out|std::ios_base::trunc,
+                        #endif
+                        outFmt, strmVer, cmpType
+                    )
                 );
             }
             break;
@@ -604,7 +611,14 @@ int main(int argc, char *argv[])
             {
                 outFileStream.reset
                 (
-                    new OFstream(outName, outFmt, strmVer, cmpType)
+                    new OFstream
+                    (
+                        outName,
+                        #ifdef FOAM_EXT_VERSION
+                        std::ios_base::out|std::ios_base::trunc,
+                        #endif
+                        outFmt, strmVer, cmpType
+                    )
                 );
             }
             break;
